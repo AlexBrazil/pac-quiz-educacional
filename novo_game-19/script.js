@@ -1653,7 +1653,6 @@ var PACMAN = (function () {
         currentPhase    = null,
         currentQuestion = null,
         ghostAIConfig   = null,
-        feedbackClearTick = null,
         ghostDistanceField = null,
         ghostDistanceFieldTick = -1,
         ghostDistanceTarget = null,
@@ -1695,7 +1694,7 @@ var PACMAN = (function () {
         }
     }
 
-    function setFeedback(message, state, durationSeconds) {
+    function setFeedback(message, state) {
         if (!hud) {
             return;
         }
@@ -1704,25 +1703,6 @@ var PACMAN = (function () {
             hud.feedback.setAttribute("data-state", state);
         } else {
             hud.feedback.removeAttribute("data-state");
-        }
-
-        if (message) {
-            var hasNumericDuration = (typeof durationSeconds === "number"),
-                explicitDuration = hasNumericDuration && durationSeconds > 0,
-                disableAuto = hasNumericDuration && durationSeconds <= 0,
-                shouldAutoClear = explicitDuration;
-            if (!shouldAutoClear && !disableAuto && (state === "positive" || state === "negative")) {
-                shouldAutoClear = true;
-                durationSeconds = 3;
-            }
-            if (shouldAutoClear) {
-                var seconds = explicitDuration ? durationSeconds : 3;
-                feedbackClearTick = tick + Math.round(seconds * Pacman.FPS);
-            } else {
-                feedbackClearTick = null;
-            }
-        } else {
-            feedbackClearTick = null;
         }
     }
 
@@ -2230,7 +2210,7 @@ var PACMAN = (function () {
 
     function gameOver() {
         setState(WAITING);
-        setFeedback("Game Over! Pressione N para reiniciar.", "negative", 0);
+        setFeedback("Game Over! Pressione N para reiniciar.", "negative");
         updatePowerHud(0);
     }
 
@@ -2283,7 +2263,7 @@ var PACMAN = (function () {
             stats.lives = user.getLives();
             updateHudStats();
         }
-        setFeedback(item.answer.feedback || "Correto! Excelente trabalho.", "positive", 3);
+        setFeedback(item.answer.feedback || "Correto! Excelente trabalho.", "positive");
         if (item.answer.correct && item.answer.grantsPower !== false) {
             activatePower(item.answer.powerDuration || currentPhase.powerDuration || settings.powerDurationSeconds);
         }
@@ -2299,7 +2279,7 @@ var PACMAN = (function () {
         if (applyLifePenalty(settings.lifePenaltyWrong || 1)) {
             return;
         }
-        setFeedback(item.answer.feedback || "Resposta incorreta. Tente outra opção!", "negative", 3);
+        setFeedback(item.answer.feedback || "Resposta incorreta. Tente outra opção!", "negative");
         deactivatePower();
         restartAfterPenalty();
     }
@@ -2364,7 +2344,7 @@ var PACMAN = (function () {
             return;
         }
         stats.streak = 0;
-        setFeedback(reason || "Uma ameba te pegou!", "negative", 3);
+        setFeedback(reason || "Uma ameba te pegou!", "negative");
         deactivatePower();
         restartAfterPenalty();
     }
@@ -2576,10 +2556,6 @@ var PACMAN = (function () {
             if ((tick - timerStart) >= questionTransitionTicks()) {
                 processPendingQuestion();
             }
-        }
-
-        if (feedbackClearTick !== null && tick >= feedbackClearTick) {
-            setFeedback("", null);
         }
 
         drawFooter();

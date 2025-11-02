@@ -120,6 +120,7 @@
             <li><code>ghostSpeedModifier</code> (multiplicador global de velocidade das amebas).</li>
             <li><code>answerScale</code> (tamanho das imagens coletáveis).</li>
             <li><code>answerSlots</code> e <code>playerStart</code> caso deseje reposicionar os itens no labirinto.</li>
+            <li><code>ghostAI</code> (modo de perseguição, intervalo de atualização do caminho, chance de desvio e retorno à base).</li>
           </ul>
         </li>
         <li>
@@ -206,6 +207,15 @@
                 <li><code>answerScale</code> (escala dos sprites das respostas) e <code>answerSlots</code> (coordenadas opcionais).</li>
                 <li><code>questionOrder</code> / <code>phaseOrder</code>: <code>"sequential"</code> ou <code>"random"</code>.</li>
                 <li><code>ghostSpeedModifier</code>: multiplicador aplicado aos movimentos das amebas (1 = velocidade original).</li>
+                <li><code>ghostAI</code>:
+                  <ul>
+                    <li><code>mode</code>: <code>"chase"</code>, <code>"random"</code> ou <code>"hybrid"</code>.</li>
+                    <li><code>pathRefreshInterval</code>: número de ticks para recalcular o caminho.</li>
+                    <li><code>randomDeviation</code>: probabilidade de escolher uma rota alternativa.</li>
+                    <li><code>fleeMultiplier</code>: intensidade da fuga durante o poder.</li>
+                    <li><code>useHomeTile</code>: se verdadeiro, amebas comidas retornam à base antes de voltar à perseguição.</li>
+                  </ul>
+                </li>
                 <li><code>playerStart</code> (opcional): tile inicial do robô, informado como coordenadas <code>{ "x": ?, "y": ? }</code>.</li>
                 <li><code>audioRoot</code>: pasta base dos efeitos sonoros.</li>
               </ul>
@@ -307,7 +317,13 @@
           <strong>Escala das respostas</strong>: <code>answerScale</code> impacta <code>renderSize</code> e <code>radius</code> na função <code>buildItem</code>.
         </li>
         <li>
+          <strong>IA das amebas</strong>: o bloco <code>ghostAI</code> em <code>game-settings.json</code> controla o modo de perseguição, enquanto o código em <code>getGhostAIDirection</code> (dentro de <span class="file-ref">script.js</span>) calcula os caminhos por BFS; é possível ajustar a frequência de recalcular o “campo de distância” via <code>pathRefreshInterval</code> ou alternar para <code>"random"</code>/<code>"hybrid"</code> se quiser reduzir a dificuldade.
+        </li>
+        <li>
           <strong>Posicionamento manual</strong>: <code>answerSlots</code> e <code>playerStart</code> são interpretados por <code>AnswerManager</code>. Utilize coordenadas de tiles (0–18 no eixo X, 0–21 no eixo Y).
+        </li>
+        <li>
+          <strong>Mensagens do HUD</strong>: <code>setFeedback</code> aceita um terceiro argumento (<code>durationSeconds</code>) que define por quantos segundos o texto permanece visível (&gt; 0 limpa automaticamente após o prazo; 0 fixa a mensagem; valores negativos desativam a limpeza automática).
         </li>
         <li>
           <strong>Sons customizados</strong>: array <code>audio_files</code> (próximo à linha 2170) define o mapeamento entre identificadores e arquivos.

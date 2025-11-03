@@ -1,19 +1,51 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
-	<title>Maintenance - Moota.co</title>
-	<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Permanent+Marker">
-	<link rel="stylesheet" href="styles.css">
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.8.3/modernizr.min.js"></script>
+  <meta charset="UTF-8">
+  <title>Pac-Quiz Educacional</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Permanent+Marker|Roboto:400,700&display=swap">
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-	<div id="shim">shim for font face</div>
-	<h1>Maintenance</h1>
-	<p>Sedang migrasi server dan upgrade engine 23:00 s/d 05:00. Mohon doanya :)</p>
-	<div id="pacman"></div>
+  <div id="app">
+    <header class="hud">
+      <div class="hud__question">
+        <span id="question-text">Carregando pergunta...</span>
+      </div>
+      <div class="hud__stats" id="hud-extra">
+        <span id="life-counter">Vidas: 0</span>
+        <span id="score-counter">Acertos: 0</span>
+        <span id="streak-counter">Sequência: 0</span>
+        <span id="phase-counter">Fase 0</span>
+      </div>
+    </header>
+    <main>
+      <div id="shim">shim for font face</div>
+      <div id="pacman"></div>
+    </main>
+    <footer class="hud hud--footer">
+      <span id="feedback-text"></span>
+      <span id="power-timer"></span>
+    </footer>
+    <div id="touch-controls" aria-hidden="true">
+      <div class="touch-topbar">
+        <button class="hud-toggle" type="button" aria-controls="hud-extra" aria-expanded="true" hidden>Ver status</button>
+        <button class="touch-start" type="button">Tocar para iniciar</button>
+      </div>
+      <div class="touch-pad" role="group" aria-label="Controle direcional">
+        <button class="pad-button pad-left" type="button" data-direction="left" aria-label="Mover para a esquerda"><span aria-hidden="true">&larr;</span></button>
+        <button class="pad-button pad-up" type="button" data-direction="up" aria-label="Mover para cima"><span aria-hidden="true">&uarr;</span></button>
+        <button class="pad-button pad-stop" type="button" data-direction="stop" aria-label="Parar movimento"><span aria-hidden="true">&#9679;</span></button>
+        <button class="pad-button pad-down" type="button" data-direction="down" aria-label="Mover para baixo"><span aria-hidden="true">&darr;</span></button>
+        <button class="pad-button pad-right" type="button" data-direction="right" aria-label="Mover para a direita"><span aria-hidden="true">&rarr;</span></button>
+      </div>
+    </div>
+  </div>
 
-	<script src="config/maze-layout.js"></script>
-	<script src="config/maze-walls.js"></script>
-	<script src="script.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.8.3/modernizr.min.js"></script>
+  <script src="config/maze-layout.js"></script>
+  <script src="config/maze-walls.js"></script>
+  <script src="script.js" type="module"></script>
 </body>
 </html>

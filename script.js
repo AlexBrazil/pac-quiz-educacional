@@ -622,6 +622,17 @@ Pacman.User = function (game, map, opts) {
         return true;
 	};
 
+    function setTouchDirection(dir) {
+        if (dir === NONE) {
+            direction = NONE;
+            due = NONE;
+            return;
+        }
+        if (dir === LEFT || dir === RIGHT || dir === UP || dir === DOWN) {
+            due = dir;
+        }
+    };
+
     function getNewCoord(dir, current) {   
         return {
             "x": current.x + (dir === LEFT && -2 || dir === RIGHT && 2 || 0),
@@ -926,7 +937,8 @@ Pacman.User = function (game, map, opts) {
         "reset"         : reset,
         "resetPosition" : resetPosition,
         "gainLife"      : gainLife,
-        "setInitialLives" : setInitialLives
+        "setInitialLives" : setInitialLives,
+        "setTouchDirection" : setTouchDirection
     };
 };
 
@@ -1583,7 +1595,16 @@ function normalizeSettings(raw) {
     cfg.powerDurationSeconds = (typeof cfg.powerDurationSeconds === "number") ? cfg.powerDurationSeconds : 8;
     cfg.transitionDelaySeconds = (typeof cfg.transitionDelaySeconds === "number") ? cfg.transitionDelaySeconds : 2;
     cfg.answerScale = (typeof cfg.answerScale === "number" && cfg.answerScale > 0) ? cfg.answerScale : 1;
-    cfg.ghostSpeedModifier = (typeof cfg.ghostSpeedModifier === "number") ? cfg.ghostSpeedModifier : 1;
+    var baseGhostSpeed = Number(cfg.ghostSpeedModifier);
+    if (!isFinite(baseGhostSpeed) || baseGhostSpeed < 0) {
+        baseGhostSpeed = 1;
+    }
+    cfg.ghostSpeedModifier = baseGhostSpeed;
+    var touchGhostSpeed = Number(cfg.touchGhostSpeedModifier);
+    if (!isFinite(touchGhostSpeed) || touchGhostSpeed < 0) {
+        touchGhostSpeed = baseGhostSpeed;
+    }
+    cfg.touchGhostSpeedModifier = touchGhostSpeed;
     cfg.questionOrder = cfg.questionOrder || "sequential";
     cfg.phaseOrder = cfg.phaseOrder || "sequential";
     cfg.answerSlots = cfg.answerSlots || [];
@@ -1662,6 +1683,27 @@ var PACMAN = (function () {
         homeTile = {"x": 9, "y": 8},
         currentUserTile = {"x": 9, "y": 12},
         TELEPORT_ROW = 10;
+
+    function isTouchModeEnabled() {
+        return typeof window !== "undefined" && !!window.__PACMAN_TOUCH_MODE__;
+    }
+
+    function startPromptText() {
+        return isTouchModeEnabled() ? "Toque para iniciar" : "Pressione N para iniciar";
+    }
+
+    function startPhasePromptText(phase) {
+        var prefix = isTouchModeEnabled() ? "Toque para iniciar a fase " : "Pressione N para iniciar a fase ";
+        return prefix + phase;
+    }
+
+    function readyFeedbackText() {
+        return isTouchModeEnabled() ? "Toque em \"Tocar para iniciar\" para começar." : "Pronto para aprender? Pressione N para começar.";
+    }
+
+    function gameOverText() {
+        return isTouchModeEnabled() ? "Fim de jogo! Toque em \"Tocar para iniciar\" para jogar novamente." : "Game Over! Pressione N para reiniciar.";
+    }
 
     function getTick() { 
         return tick;
@@ -2123,6 +2165,16 @@ var PACMAN = (function () {
         if (typeof modifier !== "number") {
             modifier = settings.ghostSpeedModifier || 1;
         }
+        if (isTouchModeEnabled()) {
+            if (typeof phase.touchGhostSpeedModifier === "number") {
+                modifier = phase.touchGhostSpeedModifier;
+            } else if (typeof settings.touchGhostSpeedModifier === "number") {
+                modifier = settings.touchGhostSpeedModifier;
+            }
+        }
+        if (typeof modifier !== "number" || !isFinite(modifier) || modifier < 0) {
+            modifier = 0;
+        }
         Pacman.ghostSpeedMultiplier = modifier;
     }
 
@@ -2161,6 +2213,9 @@ var PACMAN = (function () {
     }    
 
     function startNewGame() {
+        if (isTouchModeEnabled() && typeof window.__PACMAN_SET_MOBILE_PLAYING === "function") {
+            window.__PACMAN_SET_MOBILE_PLAYING(true);
+        }
         questionManager.reset();
         applyPhaseSettings(questionManager.currentPhase());
         resetStats();
@@ -2179,7 +2234,7 @@ var PACMAN = (function () {
             "question"     : questionManager.currentQuestion(),
             "phaseChanged" : false
         };
-        setFeedback("Colete a opção correta para responder!", "neutral");
+        setFeedback(readyFeedbackText(), "neutral", isTouchModeEnabled() ? 4 : 0);
         prepareQuestion(pendingQuestion.question, {"phaseChanged": false});
     }
 
@@ -2230,8 +2285,11 @@ var PACMAN = (function () {
 
     function gameOver() {
         setState(WAITING);
-        setFeedback("Game Over! Pressione N para reiniciar.", "negative", 0);
+        setFeedback(gameOverText(), "negative", 0);
         updatePowerHud(0);
+        if (isTouchModeEnabled() && typeof window.__PACMAN_SET_MOBILE_PLAYING === "function") {
+            window.__PACMAN_SET_MOBILE_PLAYING(false);
+        }
     }
 
     function restartAfterPenalty() {
@@ -2374,6 +2432,39 @@ var PACMAN = (function () {
         stateChanged = true;
     };
     
+    function requestStart() {
+        startNewGame();
+    }
+
+    function normalizeDirectionInput(dir) {
+        if (typeof dir === "string") {
+            var lower = dir.toLowerCase();
+            if (lower === "left" || lower === "esquerda") { return LEFT; }
+            if (lower === "right" || lower === "direita") { return RIGHT; }
+            if (lower === "up" || lower === "cima") { return UP; }
+            if (lower === "down" || lower === "baixo") { return DOWN; }
+            if (lower === "stop" || lower === "parar" || lower === "none" || lower === "center" || lower === "centro") { return NONE; }
+        }
+        if (dir === LEFT || dir === RIGHT || dir === UP || dir === DOWN) {
+            return dir;
+        }
+        if (dir === NONE) {
+            return NONE;
+        }
+        return null;
+    }
+
+    function handleTouchDirection(dir) {
+        if (!user || typeof user.setTouchDirection !== "function") {
+            return;
+        }
+        var normalized = normalizeDirectionInput(dir);
+        if (normalized === null) {
+            return;
+        }
+        user.setTouchDirection(normalized);
+    }
+
     function collided(user, ghost) {
         return (Math.sqrt(Math.pow(ghost.x - user.x, 2) + 
                           Math.pow(ghost.y - user.y, 2))) < 10;
@@ -2542,7 +2633,7 @@ var PACMAN = (function () {
         } else if (state === WAITING && stateChanged) {            
             stateChanged = false;
             map.draw(ctx);
-            dialog("Pressione N para iniciar");            
+            dialog(startPromptText());            
         } else if (state === EATEN_PAUSE && 
                    (tick - timerStart) > (Pacman.FPS / 3)) {
             map.draw(ctx);
@@ -2668,8 +2759,8 @@ var PACMAN = (function () {
         resetStats();
         stats.lives = user.getLives();
         updateHudStats();
-        setQuestionText("Pressione N para iniciar a fase 1");
-        setFeedback("Pronto para aprender? Pressione N para começar.", "neutral");
+        setQuestionText(startPhasePromptText(1));
+        setFeedback(readyFeedbackText(), "neutral", isTouchModeEnabled() ? 4 : 0);
         updatePowerHud(0);
 
         if (typeof root !== "string" || !root.length) {
@@ -2719,7 +2810,10 @@ var PACMAN = (function () {
     };
     
     return {
-        "init" : init
+        "init" : init,
+        "start" : requestStart,
+        "setDirection" : handleTouchDirection,
+        "isReady" : function () { return !!user; }
     };
     
 }());
@@ -2757,7 +2851,115 @@ Pacman.PILL    = 4;
 document.addEventListener("DOMContentLoaded", function () {
   var el = document.getElementById("pacman"),
       questionEl = document.getElementById("question-text"),
-      feedbackEl = document.getElementById("feedback-text");
+      feedbackEl = document.getElementById("feedback-text"),
+      touchControls = document.getElementById("touch-controls"),
+      hudToggle = document.querySelector(".hud-toggle"),
+      hudStats = document.getElementById("hud-extra"),
+      touchStartButton = touchControls ? touchControls.querySelector(".touch-start") : null,
+      touchPad = touchControls ? touchControls.querySelector(".touch-pad") : null,
+      touchButtons = touchPad ? Array.prototype.slice.call(touchPad.querySelectorAll("[data-direction]")) : [],
+      activePointerId = null,
+      activeDirection = null,
+      prefersTouch;
+
+  prefersTouch = prefersTouchInput();
+
+  function setHudExpanded(expanded) {
+    if (!hudToggle) {
+      return;
+    }
+    var isExpanded = !!expanded;
+    document.body.classList.toggle("hud-expanded", isExpanded);
+    hudToggle.setAttribute("aria-expanded", isExpanded ? "true" : "false");
+    hudToggle.textContent = isExpanded ? "Ocultar status" : "Ver status";
+    if (hudStats) {
+      hudStats.setAttribute("aria-hidden", isExpanded ? "false" : "true");
+    }
+  }
+
+  function setMobilePlaying(active) {
+    if (!prefersTouch) {
+      return;
+    }
+    var isActive = !!active;
+    document.body.classList.toggle("mobile-playing", isActive);
+    if (touchStartButton) {
+      touchStartButton.disabled = false;
+      touchStartButton.textContent = isActive ? "Reiniciar fase" : startPromptLabel();
+    }
+    if (isActive) {
+      setHudExpanded(false);
+    } else {
+      setHudExpanded(true);
+      setActiveButton(null);
+      activeDirection = null;
+      activePointerId = null;
+    }
+  }
+
+  window.__PACMAN_SET_MOBILE_PLAYING = setMobilePlaying;
+  window.__PACMAN_SET_HUD_EXPANDED = setHudExpanded;
+
+  function prefersTouchInput() {
+    if (typeof window.matchMedia === "function") {
+      try {
+        if (window.matchMedia("(pointer: coarse)").matches) {
+          return true;
+        }
+      } catch (err) {
+        // ignore
+      }
+    }
+    if (typeof navigator !== "undefined") {
+      if (navigator.maxTouchPoints && navigator.maxTouchPoints > 0) {
+        return true;
+      }
+      if (navigator.msMaxTouchPoints && navigator.msMaxTouchPoints > 0) {
+        return true;
+      }
+    }
+    return "ontouchstart" in window || "ontouchstart" in document.documentElement;
+  }
+
+  function startPromptLabel() {
+    return prefersTouch ? "Toque para iniciar" : "Pressione N para iniciar";
+  }
+
+  function phasePromptLabel(phase) {
+    return prefersTouch ? "Toque para iniciar a fase " + phase : "Pressione N para iniciar a fase " + phase;
+  }
+
+  function readyPromptText() {
+    return prefersTouch ? "Toque em \"Tocar para iniciar\" para começar." : "Pronto para aprender? Pressione N para começar.";
+  }
+
+  function gameOverPromptText() {
+    return prefersTouch ? "Fim de jogo! Toque em \"Tocar para iniciar\" para jogar novamente." : "Game Over! Pressione N para reiniciar.";
+  }
+
+  if (touchControls) {
+    if (prefersTouch) {
+      touchControls.classList.add("is-active");
+      touchControls.removeAttribute("aria-hidden");
+      document.body.classList.add("has-touch-controls");
+      window.__PACMAN_TOUCH_MODE__ = true;
+      if (touchStartButton) {
+        touchStartButton.disabled = true;
+        touchStartButton.textContent = "Carregando controles...";
+      }
+      if (hudToggle) {
+        hudToggle.hidden = false;
+        hudToggle.addEventListener("click", function () {
+          var expanded = !document.body.classList.contains("hud-expanded");
+          setHudExpanded(expanded);
+        });
+      }
+      setHudExpanded(true);
+    } else {
+      touchControls.setAttribute("aria-hidden", "true");
+    }
+  }
+
 
   function browserWarning() {
     if (el) {
@@ -2770,6 +2972,154 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
+  function sendDirection(dir) {
+    if (!PACMAN || typeof PACMAN.setDirection !== "function") {
+      return;
+    }
+    PACMAN.setDirection(dir);
+  }
+
+  function setActiveButton(dir) {
+    if (!touchButtons || !touchButtons.length) {
+      return;
+    }
+    touchButtons.forEach(function (button) {
+      var buttonDir = button.getAttribute("data-direction");
+      if (dir && buttonDir === dir) {
+        button.classList.add("is-active");
+      } else {
+        button.classList.remove("is-active");
+      }
+    });
+  }
+
+  function pressDirection(dir, pointerId) {
+    if (!dir) {
+      return;
+    }
+    activeDirection = dir;
+    if (typeof pointerId !== "undefined" && pointerId !== null) {
+      activePointerId = pointerId;
+    } else {
+      activePointerId = null;
+    }
+    setActiveButton(dir);
+    if (dir === "stop" || dir === "none") {
+      sendDirection("stop");
+    } else {
+      sendDirection(dir);
+    }
+  }
+
+  function releaseDirection(pointerId) {
+    if (typeof pointerId !== "undefined" && pointerId !== null &&
+        activePointerId !== null && pointerId !== activePointerId) {
+      return;
+    }
+    activePointerId = null;
+    activeDirection = null;
+    setActiveButton(null);
+  }
+
+  function attachButtonHandlers(button) {
+    if (!button) {
+      return;
+    }
+    var dir = button.getAttribute("data-direction");
+    if (!dir) {
+      return;
+    }
+
+    function safeRelease(ev) {
+      if (button.releasePointerCapture && typeof ev.pointerId !== "undefined") {
+        try {
+          button.releasePointerCapture(ev.pointerId);
+        } catch (err) { /* ignore */ }
+      }
+      ev.preventDefault();
+      releaseDirection(ev.pointerId);
+    }
+
+    if (window.PointerEvent) {
+      button.addEventListener("pointerdown", function (ev) {
+        ev.preventDefault();
+        if (activePointerId !== null &&
+            typeof ev.pointerId !== "undefined" &&
+            ev.pointerId !== activePointerId &&
+            ev.pointerType !== "mouse") {
+          return;
+        }
+        if (button.setPointerCapture && typeof ev.pointerId !== "undefined") {
+          try {
+            button.setPointerCapture(ev.pointerId);
+          } catch (err) { /* ignore */ }
+        }
+        pressDirection(dir, ev.pointerId);
+      });
+      button.addEventListener("pointerup", safeRelease);
+      button.addEventListener("pointercancel", safeRelease);
+      button.addEventListener("pointerleave", function (ev) {
+        if (typeof ev.pointerId === "undefined") {
+          return;
+        }
+        if (activePointerId !== ev.pointerId) {
+          return;
+        }
+        safeRelease(ev);
+      });
+    } else {
+      button.addEventListener("touchstart", function (ev) {
+        ev.preventDefault();
+        pressDirection(dir, null);
+      }, {passive: false});
+      button.addEventListener("touchend", function () {
+        releaseDirection(null);
+      });
+      button.addEventListener("touchcancel", function () {
+        releaseDirection(null);
+      });
+      button.addEventListener("mousedown", function (ev) {
+        ev.preventDefault();
+        pressDirection(dir, null);
+      });
+      button.addEventListener("mouseup", function () {
+        releaseDirection(null);
+      });
+      button.addEventListener("mouseleave", function () {
+        releaseDirection(null);
+      });
+    }
+
+    button.addEventListener("click", function (ev) {
+      ev.preventDefault();
+    });
+  }
+
+  function setupTouchControls() {
+    if (!touchControls) {
+      return;
+    }
+    setMobilePlaying(false);
+    if (touchStartButton) {
+      touchStartButton.disabled = false;
+      touchStartButton.addEventListener("click", function () {
+        touchStartButton.blur();
+        if (PACMAN && typeof PACMAN.start === "function") {
+          if (PACMAN.isReady && !PACMAN.isReady()) {
+            return;
+          }
+          PACMAN.start();
+        }
+      });
+    }
+    if ((!touchButtons || !touchButtons.length) && touchPad) {
+      touchButtons = Array.prototype.slice.call(touchPad.querySelectorAll("[data-direction]"));
+    }
+    if (touchButtons && touchButtons.length) {
+      touchButtons.forEach(attachButtonHandlers);
+    }
+  }
+
   if (typeof Modernizr === "undefined" ||
       !Modernizr.canvas || !Modernizr.localstorage ||
       !Modernizr.audio || !(Modernizr.audio.ogg || Modernizr.audio.mp3)) {
@@ -2778,7 +3128,7 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   if (questionEl) {
-    questionEl.textContent = "Carregando recursos educacionais...";
+    questionEl.textContent = prefersTouch ? "Carregando recursos para iniciar via toque..." : "Carregando recursos educacionais...";
   }
   if (feedbackEl) {
     feedbackEl.textContent = "";
@@ -2803,6 +3153,23 @@ document.addEventListener("DOMContentLoaded", function () {
         "phases"    : phases,
         "audioRoot" : settingsData.audioRoot
       });
+
+      if (prefersTouch) {
+        setupTouchControls();
+        setMobilePlaying(false);
+        if (touchStartButton) {
+          touchStartButton.textContent = startPromptLabel();
+        }
+        if (questionEl) {
+          questionEl.textContent = phasePromptLabel(1);
+        }
+        if (feedbackEl) {
+          feedbackEl.textContent = readyPromptText();
+          feedbackEl.setAttribute("data-state", "neutral");
+        }
+      } else if (questionEl) {
+        questionEl.textContent = phasePromptLabel(1);
+      }
     })["catch"](function (err) {
       if (feedbackEl) {
         feedbackEl.textContent = err.message;

@@ -10,6 +10,7 @@
   "questionOrder": "sequential",
   "phaseOrder": "sequential",
   "ghostSpeedModifier": 0.3,
+  "touchGhostSpeedModifier": 0.2,
   "answerSlots": [
     { "x": 1, "y": 1 },
     { "x": 17, "y": 1 },
